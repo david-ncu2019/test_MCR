@@ -16,11 +16,11 @@ def run_mcr_als_solver(
     Runs decomposition with automatic stopping criteria.
     """
     num_timesteps, num_pixels = global_total_matrix.shape
-    num_layers = len(TARGET_LAYERS)
+    num_layers = len(config.TARGET_LAYERS)
 
     # --- Initialize Signatures ---
     initial_signatures = []
-    for layer in TARGET_LAYERS:
+    for layer in config.TARGET_LAYERS:
         avg_sig = anchor_signals_dict[layer].mean(axis=1).values
         avg_sig /= np.linalg.norm(avg_sig)
         initial_signatures.append(avg_sig)
@@ -43,7 +43,7 @@ def run_mcr_als_solver(
         spatial_maps = ridge.coef_.T
 
         # 2. Apply Constraints
-        for k, layer_name in enumerate(TARGET_LAYERS):
+        for k, layer_name in enumerate(config.TARGET_LAYERS):
             true_station_data = anchor_signals_dict[layer_name].values
             current_sig = time_signatures[:, k]
             true_weights = np.dot(true_station_data.T, current_sig)
@@ -78,7 +78,7 @@ def run_mcr_als_solver(
         diff = np.linalg.norm(time_signatures - S_prev)
         relative_change = diff / (np.linalg.norm(S_prev) + 1e-9)
 
-        if relative_change < CONVERGENCE_TOLERANCE:
+        if relative_change < config.CONVERGENCE_TOLERANCE:
             # Uncomment to see convergence details
             # print(f"  Converged at iteration {i+1} (Change: {relative_change:.2e})")
             break

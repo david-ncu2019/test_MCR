@@ -4,20 +4,20 @@ import matplotlib.pyplot as plt
 
 # --- IMPORTS FROM OUR MODULES ---
 import config
-import data_loader
-import solver
-import analytics
+from data_loader import load_data, generate_map_grid, build_total_map
+from solver import run_mcr_als_solver
+from analytics import optimize_parameters, evaluate_prediction_uncertainty
 
 if __name__ == "__main__":
 
     # 1. Load Data
     print("Loading Data...")
     times, stations, anchor_coords, total_matrix, anchor_signals = load_data(
-        INPUT_FILE
+        config.INPUT_FILE
     )
 
     # 2. Build Map Grid
-    all_pixel_coords, Xi, Yi = generate_map_grid(anchor_coords, MAP_RESOLUTION)
+    all_pixel_coords, Xi, Yi = generate_map_grid(anchor_coords, config.MAP_RESOLUTION)
     global_total_matrix = build_total_map(
         total_matrix, anchor_coords, stations, all_pixel_coords
     )
@@ -71,11 +71,11 @@ if __name__ == "__main__":
 
     # 2. Reshape all maps to 2D grids
     # Mean Map (The Prediction)
-    coef_grid = mean_A[0, :].reshape(MAP_RESOLUTION, MAP_RESOLUTION)
+    coef_grid = mean_A[0, :].reshape(config.MAP_RESOLUTION, config.MAP_RESOLUTION)
     # Standard Deviation (Absolute Error)
-    uncert_grid = uncertainty_A[0, :].reshape(MAP_RESOLUTION, MAP_RESOLUTION)
+    uncert_grid = uncertainty_A[0, :].reshape(config.MAP_RESOLUTION, config.MAP_RESOLUTION)
     # Coefficient of Variation (Relative Error)
-    cv_grid = cv_A[0, :].reshape(MAP_RESOLUTION, MAP_RESOLUTION)
+    cv_grid = cv_A[0, :].reshape(config.MAP_RESOLUTION, config.MAP_RESOLUTION)
 
     # 3. Create a 3-Panel Plot
     fig, axes = plt.subplots(1, 3, figsize=(24, 6))

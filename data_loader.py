@@ -18,7 +18,7 @@ def load_data(filepath):
         index="time", columns="STATION", values="Layer_Total"
     )
     anchor_signals_dict = {}
-    for layer in TARGET_LAYERS:
+    for layer in config.TARGET_LAYERS:
         anchor_signals_dict[layer] = df.pivot(
             index="time", columns="STATION", values=layer
         )

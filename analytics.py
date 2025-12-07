@@ -22,13 +22,13 @@ def optimize_parameters(
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-    total_combinations = len(PARAM_GRID["blending_alpha"]) * len(
-        PARAM_GRID["ridge_alpha"]
+    total_combinations = len(config.PARAM_GRID["blending_alpha"]) * len(
+        config.PARAM_GRID["ridge_alpha"]
     )
     count = 0
 
-    for b_alpha in PARAM_GRID["blending_alpha"]:
-        for r_alpha in PARAM_GRID["ridge_alpha"]:
+    for b_alpha in config.PARAM_GRID["blending_alpha"]:
+        for r_alpha in config.PARAM_GRID["ridge_alpha"]:
             count += 1
             print(
                 f"Testing Config {count}/{total_combinations}: [Blend={b_alpha}, Ridge={r_alpha}]...",
@@ -55,7 +55,7 @@ def optimize_parameters(
                 # Subset dictionary
                 train_signals_dict = {
                     l: anchor_signals_dict[l][train_stations]
-                    for l in TARGET_LAYERS
+                    for l in config.TARGET_LAYERS
                 }
 
                 # Run Solver (Silent Mode)
@@ -76,7 +76,7 @@ def optimize_parameters(
                     )
                     test_pixel_idx = np.argmin(dists)
 
-                    for k, layer in enumerate(TARGET_LAYERS):
+                    for k, layer in enumerate(config.TARGET_LAYERS):
                         pred = A_fold[k, test_pixel_idx] * S_fold[:, k]
                         truth = anchor_signals_dict[layer][s_test].values
                         fold_errors.append(mean_squared_error(truth, pred))
@@ -124,7 +124,7 @@ def evaluate_prediction_uncertainty(
     print(f"\nSTARTING UNCERTAINTY ANALYSIS ({n_iterations} runs)...")
 
     num_pixels = len(all_pixel_coords)
-    num_layers = len(TARGET_LAYERS)
+    num_layers = len(config.TARGET_LAYERS)
 
     # Storage for all the maps we generate
     # Shape: (Iterations, Layers, Pixels)
@@ -133,7 +133,7 @@ def evaluate_prediction_uncertainty(
     # 1. Pre-calculate the 'Master' Static Anchor (using ALL data)
     # We use this to ensure signs don't flip between runs (Alignment)
     full_signatures = []
-    for layer in TARGET_LAYERS:
+    for layer in config.TARGET_LAYERS:
         sig = anchor_signals_dict[layer].mean(axis=1).values
         full_signatures.append(sig / np.linalg.norm(sig))
     reference_signatures = np.column_stack(full_signatures)
@@ -165,7 +165,7 @@ def evaluate_prediction_uncertainty(
         _, A_subset = run_mcr_als_solver(
             total_matrix,
             subset_indices,
-            {l: anchor_signals_dict[l][subset_stations] for l in TARGET_LAYERS},
+            {l: anchor_signals_dict[l][subset_stations] for l in config.TARGET_LAYERS},
             all_pixel_coords,
             best_blend,
             best_ridge,
