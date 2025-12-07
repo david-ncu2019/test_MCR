@@ -1,5 +1,6 @@
 # analytics.py
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
 import config
@@ -189,3 +190,118 @@ def evaluate_prediction_uncertainty(
     cv_map = std_map / (np.abs(mean_map) + config.EPSILON)
 
     return mean_map, std_map, cv_map
+
+
+def generate_predictions_table(
+    original_df,
+    time_signatures,
+    spatial_maps,
+    anchor_coords,
+    all_pixel_coords,
+):
+    """
+    Generate a comprehensive table with original data and predictions.
+    
+    Args:
+        original_df: Original DataFrame with all data
+        time_signatures: S matrix from MCR-ALS (time x layers)
+        spatial_maps: A matrix from MCR-ALS (layers x pixels)
+        anchor_coords: Dictionary mapping station names to coordinates
+        all_pixel_coords: Array of all pixel coordinates
+    
+    Returns:
+        pandas.DataFrame: Table with original columns plus predicted columns
+    """
+    print("Generating predictions table...")
+    
+    # Create a copy of original data to avoid modifying input
+    results_df = original_df.copy()
+    
+    # Find pixel indices for each station
+    station_pixel_map = {}
+    for station in anchor_coords.keys():
+        s_loc = np.array(anchor_coords[station])
+        dists = np.sum((all_pixel_coords - s_loc) ** 2, axis=1)
+        station_pixel_map[station] = np.argmin(dists)
+    
+    # Generate predictions for each layer
+    for layer_idx, layer_name in enumerate(config.TARGET_LAYERS):
+        pred_column_name = f"{layer_name}_predicted"
+        results_df[pred_column_name] = np.nan
+        
+        # For each row in the original data
+        for idx, row in results_df.iterrows():
+            station = row['STATION']
+            time_idx = np.where(original_df['time'] == row['time'])[0][0]
+            
+            # Get pixel index for this station
+            pixel_idx = station_pixel_map[station]
+            
+            # Calculate prediction: A[layer, pixel] * S[time, layer]
+            prediction = spatial_maps[layer_idx, pixel_idx] * time_signatures[time_idx, layer_idx]
+            results_df.loc[idx, pred_column_name] = prediction
+    
+    # Generate predicted Layer_Total
+    results_df['Layer_Total_predicted'] = np.nan
+    for idx, row in results_df.iterrows():
+        station = row['STATION']
+        time_idx = np.where(original_df['time'] == row['time'])[0][0]
+        pixel_idx = station_pixel_map[station]
+        
+        # Sum all layer contributions for total
+        total_pred = sum(
+            spatial_maps[k, pixel_idx] * time_signatures[time_idx, k] 
+            for k in range(len(config.TARGET_LAYERS))
+        )
+        results_df.loc[idx, 'Layer_Total_predicted'] = total_pred
+    
+    # Calculate residuals (differences)
+    for layer_name in config.TARGET_LAYERS:
+        results_df[f"{layer_name}_residual"] = (
+            results_df[layer_name] - results_df[f"{layer_name}_predicted"]
+        )
+    
+    results_df['Layer_Total_residual'] = (
+        results_df['Layer_Total'] - results_df['Layer_Total_predicted']
+    )
+    
+    return results_df
+
+
+def generate_summary_statistics(predictions_df):
+    """
+    Generate summary statistics for model performance.
+    
+    Args:
+        predictions_df: DataFrame from generate_predictions_table
+    
+    Returns:
+        pandas.DataFrame: Summary statistics by layer
+    """
+    print("Calculating summary statistics...")
+    
+    summary_stats = []
+    
+    # Statistics for each layer
+    for layer_name in config.TARGET_LAYERS + ['Layer_Total']:
+        original_col = layer_name
+        predicted_col = f"{layer_name}_predicted"
+        residual_col = f"{layer_name}_residual"
+        
+        # Calculate metrics
+        mae = np.mean(np.abs(predictions_df[residual_col]))
+        rmse = np.sqrt(np.mean(predictions_df[residual_col] ** 2))
+        r2 = np.corrcoef(predictions_df[original_col], predictions_df[predicted_col])[0, 1] ** 2
+        
+        summary_stats.append({
+            'Layer': layer_name,
+            'MAE': mae,
+            'RMSE': rmse,
+            'R²': r2,
+            'Mean_Original': predictions_df[original_col].mean(),
+            'Mean_Predicted': predictions_df[predicted_col].mean(),
+            'Std_Original': predictions_df[original_col].std(),
+            'Std_Predicted': predictions_df[predicted_col].std()
+        })
+    
+    return pd.DataFrame(summary_stats)
