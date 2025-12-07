@@ -200,7 +200,7 @@ def generate_predictions_table(
     all_pixel_coords,
 ):
     """
-    Generate a comprehensive table with original data and predictions.
+    Generate a comprehensive table with original data, coefficients, and predictions.
     
     Args:
         original_df: Original DataFrame with all data
@@ -210,7 +210,7 @@ def generate_predictions_table(
         all_pixel_coords: Array of all pixel coordinates
     
     Returns:
-        pandas.DataFrame: Table with original columns plus predicted columns
+        pandas.DataFrame: Table with original columns plus coefficients and predictions
     """
     print("Generating predictions table...")
     
@@ -223,6 +223,17 @@ def generate_predictions_table(
         s_loc = np.array(anchor_coords[station])
         dists = np.sum((all_pixel_coords - s_loc) ** 2, axis=1)
         station_pixel_map[station] = np.argmin(dists)
+    
+    # Add coefficient columns for each layer
+    for layer_idx, layer_name in enumerate(config.TARGET_LAYERS):
+        coef_column_name = f"{layer_name}_coefficient"
+        results_df[coef_column_name] = np.nan
+        
+        # For each row, add the spatial coefficient
+        for idx, row in results_df.iterrows():
+            station = row['STATION']
+            pixel_idx = station_pixel_map[station]
+            results_df.loc[idx, coef_column_name] = spatial_maps[layer_idx, pixel_idx]
     
     # Generate predictions for each layer
     for layer_idx, layer_name in enumerate(config.TARGET_LAYERS):
@@ -297,7 +308,7 @@ def generate_summary_statistics(predictions_df):
             'Layer': layer_name,
             'MAE': mae,
             'RMSE': rmse,
-            'R²': r2,
+            'R_sq': r2,
             'Mean_Original': predictions_df[original_col].mean(),
             'Mean_Predicted': predictions_df[predicted_col].mean(),
             'Std_Original': predictions_df[original_col].std(),

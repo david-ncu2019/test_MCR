@@ -1,9 +1,10 @@
 # main.py
 import numpy as np
 import pandas as pd
+from datetime import datetime
 
 import config
-from data_loader import load_data, generate_map_grid, build_total_map
+from data_loader import load_data, generate_map_grid, build_total_map, preprocess_data
 from solver import run_mcr_als_solver
 from analytics import optimize_parameters, generate_predictions_table, generate_summary_statistics
 
@@ -11,9 +12,12 @@ if __name__ == "__main__":
     
     print("Loading Data...")
     times, stations, anchor_coords, total_matrix, anchor_signals = load_data(config.INPUT_FILE)
-    original_df = pd.read_csv(config.INPUT_FILE)
     
-    print(f"Loaded {len(stations)} stations with {len(times)} time steps")
+    # Load and preprocess original data for predictions table
+    original_df = pd.read_csv(config.INPUT_FILE)
+    original_df = preprocess_data(original_df)
+    
+    print(f"Final dataset: {len(stations)} stations, {len(times)} time steps")
 
     print("Building Map Grid...")
     all_pixel_coords, Xi, Yi = generate_map_grid(anchor_coords, config.MAP_RESOLUTION)
@@ -39,15 +43,20 @@ if __name__ == "__main__":
     summary_stats = generate_summary_statistics(predictions_df)
     
     print("Saving Results...")
-    predictions_df.to_csv('predictions_table.csv', index=False)
-    summary_stats.to_csv('model_performance_summary.csv', index=False)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    predictions_file = f"{timestamp}_predictions_table.csv"
+    summary_file = f"{timestamp}_model_performance_summary.csv"
+    
+    predictions_df.to_csv(predictions_file, index=False)
+    summary_stats.to_csv(summary_file, index=False)
+    
+    print(f"Files saved: {predictions_file}, {summary_file}")
     
     print("\n=== MODEL PERFORMANCE SUMMARY ===")
     print(summary_stats.to_string(index=False, float_format='%.4f'))
     
     print("\n=== SAMPLE PREDICTIONS ===")
-    sample_cols = ['time', 'STATION', 'X', 'Y', 'Layer_1', 'Layer_1_predicted', 'Layer_1_residual']
+    sample_cols = ['time', 'STATION', 'X', 'Y', 'Layer_1', 'Layer_1_coefficient', 'Layer_1_predicted', 'Layer_1_residual']
     print(predictions_df[sample_cols].head(8).to_string(index=False, float_format='%.4f'))
     
-    print(f"\nModel completed! Best params: Blend={best_blend}, Ridge={best_ridge}")
-
+    print(f"\nCompleted! Best params: Blend={best_blend}, Ridge={best_ridge}")

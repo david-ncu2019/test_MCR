@@ -4,11 +4,37 @@ import numpy as np
 from scipy.interpolate import griddata
 import config
 
-def load_data(filepath):
-    """Load data from CSV file with standard column structure."""
-    df = pd.read_csv(filepath)
+def preprocess_data(df):
+    """Preprocess DataFrame with flexible column mapping and station filtering."""
     
-    # Handle missing values if configured
+    # Handle index-based STATION column
+    if config.STATION_INDEX_AS_COLUMN and df.index.name == 'STATION':
+        df = df.reset_index()
+        print("Reset STATION from index to column")
+    
+    # Rename columns according to mapping
+    df = df.rename(columns={
+        config.COLUMN_MAPPING['x_col']: 'X',
+        config.COLUMN_MAPPING['y_col']: 'Y',
+        config.COLUMN_MAPPING['time_col']: 'time',
+        config.COLUMN_MAPPING['total_col']: 'Layer_Total'
+    })
+    print(f"Renamed columns: {config.COLUMN_MAPPING['x_col']}→X, {config.COLUMN_MAPPING['y_col']}→Y, {config.COLUMN_MAPPING['total_col']}→Layer_Total")
+    
+    # Filter stations with insufficient observations
+    station_counts = df['STATION'].value_counts()
+    valid_stations = station_counts[station_counts >= config.MIN_OBSERVATIONS_PER_STATION]
+    excluded_stations = station_counts[station_counts < config.MIN_OBSERVATIONS_PER_STATION]
+    
+    if len(excluded_stations) > 0:
+        print(f"Excluding {len(excluded_stations)} stations with <{config.MIN_OBSERVATIONS_PER_STATION} observations:")
+        for station, count in excluded_stations.items():
+            print(f"  {station}: {count} observations")
+        df = df[df['STATION'].isin(valid_stations.index)]
+    
+    print(f"Kept {len(valid_stations)} stations with ≥{config.MIN_OBSERVATIONS_PER_STATION} observations")
+    
+    # Handle missing values
     if config.HANDLE_MISSING_VALUES:
         missing_before = df[config.TARGET_LAYERS].isnull().sum().sum()
         
@@ -29,7 +55,15 @@ def load_data(filepath):
             df[config.TARGET_LAYERS] = df[config.TARGET_LAYERS].fillna(0)
         
         missing_after = df[config.TARGET_LAYERS].isnull().sum().sum()
-        print(f"Missing values handled: {missing_before} → {missing_after}")
+        print(f"Missing values: {missing_before} → {missing_after}")
+    
+    return df.sort_values(['STATION', 'time']).reset_index(drop=True)
+
+
+def load_data(filepath):
+    """Load and preprocess data with flexible column mapping."""
+    df = pd.read_csv(filepath)
+    df = preprocess_data(df)
     
     time_steps = np.sort(df["time"].unique())
     station_names = df["STATION"].unique()

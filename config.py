@@ -1,15 +1,24 @@
 # config.py
 
 # Data Configuration
-INPUT_FILE = "your_data.csv"  # Set to your CSV file path
+INPUT_FILE = "your_data.csv"
 TARGET_LAYERS = ["Layer_1", "Layer_2", "Layer_3", "Layer_4"]
 MAP_RESOLUTION = 50
 
-# Expected CSV columns: STATION, X, Y, time, Layer_Total, Layer_1, Layer_2, Layer_3, Layer_4
+# Column mapping - customize for your dataset
+COLUMN_MAPPING = {
+    'station_col': 'STATION',  # Will be reset from index if needed
+    'x_col': 'X_TWD97',        # Your coordinate columns
+    'y_col': 'Y_TWD97',
+    'time_col': 'time',
+    'total_col': 'Layer_All'   # or 'DIFFDISP' - choose your total signal column
+}
 
 # Data preprocessing options
 HANDLE_MISSING_VALUES = True
-MISSING_VALUE_STRATEGY = 'interpolate'  # 'drop', 'interpolate', 'fill_zero'
+MISSING_VALUE_STRATEGY = 'drop'  # 'drop', 'interpolate', 'fill_zero'
+MIN_OBSERVATIONS_PER_STATION = 30  # Filter stations with too few observations
+STATION_INDEX_AS_COLUMN = False  # Set True if STATION is the DataFrame index
 
 # Algorithm Parameters
 CONVERGENCE_TOLERANCE = 1e-6
