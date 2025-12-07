@@ -1,0 +1,61 @@
+# data_loader.py
+import pandas as pd
+import numpy as np
+from scipy.interpolate import griddata
+import config # Import settings if needed
+
+def load_data(filepath):
+    df = pd.read_csv(filepath)
+    time_steps = np.sort(df["time"].unique())
+    station_names = df["STATION"].unique()
+
+    anchor_coords = {}
+    for station in station_names:
+        row = df[df["STATION"] == station].iloc[0]
+        anchor_coords[station] = (row["X"], row["Y"])
+
+    total_signal_matrix = df.pivot(
+        index="time", columns="STATION", values="Layer_Total"
+    )
+    anchor_signals_dict = {}
+    for layer in TARGET_LAYERS:
+        anchor_signals_dict[layer] = df.pivot(
+            index="time", columns="STATION", values=layer
+        )
+
+    return (
+        time_steps,
+        station_names,
+        anchor_coords,
+        total_signal_matrix,
+        anchor_signals_dict,
+    )
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+def generate_map_grid(anchor_coords, resolution):
+    x_vals = [c[0] for c in anchor_coords.values()]
+    y_vals = [c[1] for c in anchor_coords.values()]
+    xi = np.linspace(min(x_vals) - 1, max(x_vals) + 1, resolution)
+    yi = np.linspace(min(y_vals) - 1, max(y_vals) + 1, resolution)
+    Xi, Yi = np.meshgrid(xi, yi)
+    return np.column_stack([Xi.ravel(), Yi.ravel()]), Xi, Yi
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+def build_total_map(total_matrix, anchor_coords, station_names, all_pixels):
+    num_times = total_matrix.shape[0]
+    total_map = np.zeros((num_times, len(all_pixels)))
+    station_locs = np.array([anchor_coords[s] for s in station_names])
+
+    for t_idx in range(num_times):
+        vals = total_matrix.iloc[t_idx].values
+        # Cubic interpolation
+        total_map[t_idx, :] = griddata(
+            station_locs, vals, all_pixels, method="cubic", fill_value=0
+        )
+        mask = np.isnan(total_map[t_idx, :])
+        if np.any(mask):
+            total_map[t_idx, mask] = griddata(
+                station_locs, vals, all_pixels[mask], method="nearest"
+            )
+    return total_map
