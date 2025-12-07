@@ -2,7 +2,7 @@
 import numpy as np
 from sklearn.linear_model import Ridge
 import config
-from utils import smooth_grid_values # Import the helper function
+from utils import smooth_grid_values
 
 def run_mcr_als_solver(
     global_total_matrix,
@@ -30,12 +30,10 @@ def run_mcr_als_solver(
 
     # Initialize Maps
     spatial_maps = np.zeros((num_layers, num_pixels))
-    ridge = Ridge(alpha=ridge_alpha, fit_intercept=False)
+    ridge = Ridge(alpha=ridge_alpha, fit_intercept=config.RIDGE_FIT_INTERCEPT)
 
     # --- Iteration Loop ---
-    MAX_ITER = 100  # High ceiling, but we expect to stop early
-
-    for i in range(MAX_ITER):
+    for i in range(config.MAX_ITERATIONS):
         S_prev = time_signatures.copy()  # Store for convergence check
 
         # 1. Update Maps
@@ -73,14 +71,12 @@ def run_mcr_als_solver(
                 time_signatures[:, k] = -time_signatures[:, k]
             time_signatures[:, k] /= np.linalg.norm(time_signatures[:, k])
 
-        # --- 5. STOP CRITERIA CHECK (New) ---
+        # --- 5. STOP CRITERIA CHECK ---
         # Calculate Frobenius norm of the difference (Relative Change)
         diff = np.linalg.norm(time_signatures - S_prev)
-        relative_change = diff / (np.linalg.norm(S_prev) + 1e-9)
+        relative_change = diff / (np.linalg.norm(S_prev) + config.EPSILON)
 
         if relative_change < config.CONVERGENCE_TOLERANCE:
-            # Uncomment to see convergence details
-            # print(f"  Converged at iteration {i+1} (Change: {relative_change:.2e})")
             break
 
     return time_signatures, spatial_maps

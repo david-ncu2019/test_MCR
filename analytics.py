@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
 import config
-from solver import run_mcr_als_solver # Needs the solver to test parameters
+from solver import run_mcr_als_solver
 
 def optimize_parameters(
     total_matrix,
@@ -20,7 +20,7 @@ def optimize_parameters(
     station_indices = np.arange(len(station_names))
     results = []
 
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    kf = KFold(n_splits=config.CV_FOLDS, shuffle=True, random_state=config.CV_RANDOM_STATE)
 
     total_combinations = len(config.PARAM_GRID["blending_alpha"]) * len(
         config.PARAM_GRID["ridge_alpha"]
@@ -39,7 +39,7 @@ def optimize_parameters(
 
             # --- CROSS VALIDATION LOOP ---
             for train_idx, test_idx in kf.split(station_indices):
-                # FIXED HERE: Use train_idx directly on station_names
+                # Use train_idx directly on station_names
                 train_stations = station_names[train_idx]
                 test_stations = station_names[test_idx]
 
@@ -100,7 +100,6 @@ def optimize_parameters(
 
     return best_config["blending_alpha"], best_config["ridge_alpha"]
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
 def evaluate_prediction_uncertainty(
     total_matrix,
@@ -110,17 +109,23 @@ def evaluate_prediction_uncertainty(
     all_pixel_coords,
     best_blend,
     best_ridge,
-    n_iterations=30,
-    subsample_ratio=0.8,
+    n_iterations=None,
+    subsample_ratio=None,
 ):
     """
     Performs Bootstrap Analysis to estimate the uncertainty (Standard Deviation)
     of the spatial maps.
 
     Args:
-        n_iterations: How many times to re-run the model (e.g., 30-50).
-        subsample_ratio: Percentage of stations to keep in each run (e.g., 0.8).
+        n_iterations: How many times to re-run the model. Uses config default if None.
+        subsample_ratio: Percentage of stations to keep in each run. Uses config default if None.
     """
+    # Use config defaults if parameters not specified
+    if n_iterations is None:
+        n_iterations = config.BOOTSTRAP_ITERATIONS
+    if subsample_ratio is None:
+        subsample_ratio = config.SUBSAMPLE_RATIO
+        
     print(f"\nSTARTING UNCERTAINTY ANALYSIS ({n_iterations} runs)...")
 
     num_pixels = len(all_pixel_coords)
@@ -140,7 +145,7 @@ def evaluate_prediction_uncertainty(
 
     # 2. Bootstrap Loop
     for i in range(n_iterations):
-        if (i + 1) % 5 == 0:
+        if (i + 1) % config.BOOTSTRAP_PRINT_INTERVAL == 0:
             print(f"  Bootstrap Run {i+1}/{n_iterations}...")
 
         # A. Randomly Select a Subset of Stations
@@ -158,10 +163,6 @@ def evaluate_prediction_uncertainty(
             subset_indices.append(np.argmin(dists))
 
         # C. Run Solver (Silent Mode)
-        # Note: We pass the 'reference_signatures' to keep signs consistent?
-        # Actually, the solver builds its own anchors from the subset.
-        # We will align them *after* the solver finishes.
-
         _, A_subset = run_mcr_als_solver(
             total_matrix,
             subset_indices,
@@ -185,6 +186,6 @@ def evaluate_prediction_uncertainty(
 
     # Relative Uncertainty (Coefficient of Variation)
     # Avoid division by zero
-    cv_map = std_map / (np.abs(mean_map) + 1e-9)
+    cv_map = std_map / (np.abs(mean_map) + config.EPSILON)
 
     return mean_map, std_map, cv_map

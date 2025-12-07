@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 from scipy.interpolate import griddata
-import config # Import settings if needed
+import config
 
 def load_data(filepath):
     df = pd.read_csv(filepath)
@@ -32,16 +32,23 @@ def load_data(filepath):
     )
 
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 def generate_map_grid(anchor_coords, resolution):
     x_vals = [c[0] for c in anchor_coords.values()]
     y_vals = [c[1] for c in anchor_coords.values()]
-    xi = np.linspace(min(x_vals) - 1, max(x_vals) + 1, resolution)
-    yi = np.linspace(min(y_vals) - 1, max(y_vals) + 1, resolution)
+    xi = np.linspace(
+        min(x_vals) - config.GRID_PADDING, 
+        max(x_vals) + config.GRID_PADDING, 
+        resolution
+    )
+    yi = np.linspace(
+        min(y_vals) - config.GRID_PADDING, 
+        max(y_vals) + config.GRID_PADDING, 
+        resolution
+    )
     Xi, Yi = np.meshgrid(xi, yi)
     return np.column_stack([Xi.ravel(), Yi.ravel()]), Xi, Yi
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
 def build_total_map(total_matrix, anchor_coords, station_names, all_pixels):
     num_times = total_matrix.shape[0]
     total_map = np.zeros((num_times, len(all_pixels)))
@@ -49,13 +56,21 @@ def build_total_map(total_matrix, anchor_coords, station_names, all_pixels):
 
     for t_idx in range(num_times):
         vals = total_matrix.iloc[t_idx].values
-        # Cubic interpolation
+        # Primary interpolation method
         total_map[t_idx, :] = griddata(
-            station_locs, vals, all_pixels, method="cubic", fill_value=0
+            station_locs, 
+            vals, 
+            all_pixels, 
+            method=config.INTERPOLATION_METHOD_PRIMARY, 
+            fill_value=config.FILL_VALUE
         )
+        # Handle NaN values with fallback method
         mask = np.isnan(total_map[t_idx, :])
         if np.any(mask):
             total_map[t_idx, mask] = griddata(
-                station_locs, vals, all_pixels[mask], method="nearest"
+                station_locs, 
+                vals, 
+                all_pixels[mask], 
+                method=config.INTERPOLATION_METHOD_FALLBACK
             )
     return total_map

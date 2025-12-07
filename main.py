@@ -53,6 +53,7 @@ if __name__ == "__main__":
     )
 
     # 5. Run Uncertainty Analysis (Bootstrap)
+    # Uses config defaults for n_iterations and subsample_ratio
     mean_A, uncertainty_A, cv_A = evaluate_prediction_uncertainty(
         global_total_matrix,
         anchor_signals,
@@ -61,7 +62,6 @@ if __name__ == "__main__":
         all_pixel_coords,
         best_blend,
         best_ridge,
-        n_iterations=20,
     )
 
     print("\nVisualizing Layer 1 Analysis...")
@@ -78,47 +78,44 @@ if __name__ == "__main__":
     cv_grid = cv_A[0, :].reshape(config.MAP_RESOLUTION, config.MAP_RESOLUTION)
 
     # 3. Create a 3-Panel Plot
-    fig, axes = plt.subplots(1, 3, figsize=(24, 6))
+    fig, axes = plt.subplots(1, 3, figsize=config.FIGURE_SIZE)
 
     # --- Plot 1: The Prediction (Mean) ---
     im1 = axes[0].imshow(
         coef_grid,
         extent=[Xi.min(), Xi.max(), Yi.min(), Yi.max()],
         origin="lower",
-        cmap="turbo",
+        cmap=config.COLORMAP_PREDICTION,
     )
     axes[0].set_title(f"1. Prediction (Mean) | Alpha={best_blend}")
     plt.colorbar(im1, ax=axes[0], label="Coefficient Value")
 
     # --- Plot 2: Absolute Uncertainty (Sigma) ---
-    # This is what you saw before (High error at center)
     im2 = axes[1].imshow(
         uncert_grid,
         extent=[Xi.min(), Xi.max(), Yi.min(), Yi.max()],
         origin="lower",
-        cmap="inferno",
+        cmap=config.COLORMAP_UNCERTAINTY,
     )
     axes[1].set_title("2. Absolute Uncertainty (Sigma)")
     plt.colorbar(im2, ax=axes[1], label="Meters (or Units)")
     axes[1].scatter(
         station_locs[:, 0],
         station_locs[:, 1],
-        c="white",
-        s=5,
-        alpha=0.5,
-        label="Stations",
+        c=config.STATION_SCATTER_CONFIG['color'],
+        s=config.STATION_SCATTER_CONFIG['size'],
+        alpha=config.STATION_SCATTER_CONFIG['alpha'],
+        label=config.STATION_SCATTER_CONFIG['label'],
     )
 
     # --- Plot 3: Relative Uncertainty (CV) ---
-    # This is the "Truth". It divides Error by Signal.
-    # Green = Good (Low %), Red = Bad (High %)
     im3 = axes[2].imshow(
         cv_grid,
         extent=[Xi.min(), Xi.max(), Yi.min(), Yi.max()],
         origin="lower",
-        cmap="RdYlGn_r",
-        vmin=0,
-        vmax=0.5,
+        cmap=config.COLORMAP_RELATIVE,
+        vmin=config.CV_PLOT_VMIN,
+        vmax=config.CV_PLOT_VMAX,
     )
     axes[2].set_title("3. Relative Uncertainty (CV)")
     plt.colorbar(im3, ax=axes[2], label="Relative Error (%)")
