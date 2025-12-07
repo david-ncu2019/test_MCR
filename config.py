@@ -16,7 +16,7 @@ COLUMN_MAPPING = {
 
 # Data preprocessing options
 HANDLE_MISSING_VALUES = True
-MISSING_VALUE_STRATEGY = 'drop'  # 'drop', 'interpolate', 'fill_zero'
+MISSING_VALUE_STRATEGY = 'interpolate'  # 'drop', 'interpolate', 'fill_zero'
 MIN_OBSERVATIONS_PER_STATION = 30  # Filter stations with too few observations
 STATION_INDEX_AS_COLUMN = False  # Set True if STATION is the DataFrame index
 

@@ -10,11 +10,14 @@ from analytics import optimize_parameters, generate_predictions_table, generate_
 
 if __name__ == "__main__":
     
+    # Update the input file path to match the actual data file
+    config.INPUT_FILE = "CRFP_diffdisp.txt"
+    
     print("Loading Data...")
     times, stations, anchor_coords, total_matrix, anchor_signals = load_data(config.INPUT_FILE)
     
     # Load and preprocess original data for predictions table
-    original_df = pd.read_csv(config.INPUT_FILE)
+    original_df = pd.read_csv(config.INPUT_FILE, delimiter='\t')  # Use tab delimiter for .txt file
     original_df = preprocess_data(original_df)
     
     print(f"Final dataset: {len(stations)} stations, {len(times)} time steps")

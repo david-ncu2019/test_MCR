@@ -53,11 +53,13 @@ def optimize_parameters(
                     )
                     train_pixel_indices.append(np.argmin(dists))
 
-                # Subset dictionary
-                train_signals_dict = {
-                    l: anchor_signals_dict[l][train_stations]
-                    for l in config.TARGET_LAYERS
-                }
+                # Subset dictionary with NaN handling
+                train_signals_dict = {}
+                for l in config.TARGET_LAYERS:
+                    subset_data = anchor_signals_dict[l][train_stations]
+                    # Ensure no NaN values in training data
+                    subset_data = subset_data.fillna(0)
+                    train_signals_dict[l] = subset_data
 
                 # Run Solver (Silent Mode)
                 S_fold, A_fold = run_mcr_als_solver(
@@ -80,9 +82,20 @@ def optimize_parameters(
                     for k, layer in enumerate(config.TARGET_LAYERS):
                         pred = A_fold[k, test_pixel_idx] * S_fold[:, k]
                         truth = anchor_signals_dict[layer][s_test].values
-                        fold_errors.append(mean_squared_error(truth, pred))
+                        
+                        # Handle NaN values in truth data
+                        truth = np.nan_to_num(truth, nan=0.0)
+                        pred = np.nan_to_num(pred, nan=0.0)
+                        
+                        # Only compute MSE if we have valid data
+                        if len(truth) > 0 and len(pred) > 0:
+                            fold_errors.append(mean_squared_error(truth, pred))
 
-            avg_rmse = np.sqrt(np.mean(fold_errors))
+            if len(fold_errors) > 0:
+                avg_rmse = np.sqrt(np.mean(fold_errors))
+            else:
+                avg_rmse = 1e6  # Large error if no valid data
+                
             results.append(
                 {
                     "blending_alpha": b_alpha,
@@ -141,7 +154,11 @@ def evaluate_prediction_uncertainty(
     full_signatures = []
     for layer in config.TARGET_LAYERS:
         sig = anchor_signals_dict[layer].mean(axis=1).values
-        full_signatures.append(sig / np.linalg.norm(sig))
+        sig = np.nan_to_num(sig, nan=0.0)  # Handle NaN
+        sig_norm = np.linalg.norm(sig)
+        if sig_norm > 0:
+            sig = sig / sig_norm
+        full_signatures.append(sig)
     reference_signatures = np.column_stack(full_signatures)
 
     # 2. Bootstrap Loop
@@ -163,11 +180,18 @@ def evaluate_prediction_uncertainty(
             )
             subset_indices.append(np.argmin(dists))
 
+        # C. Prepare subset signals with NaN handling
+        subset_signals = {}
+        for l in config.TARGET_LAYERS:
+            subset_data = anchor_signals_dict[l][subset_stations]
+            subset_data = subset_data.fillna(0)  # Handle NaN
+            subset_signals[l] = subset_data
+
         # C. Run Solver (Silent Mode)
         _, A_subset = run_mcr_als_solver(
             total_matrix,
             subset_indices,
-            {l: anchor_signals_dict[l][subset_stations] for l in config.TARGET_LAYERS},
+            subset_signals,
             all_pixel_coords,
             best_blend,
             best_ridge,
