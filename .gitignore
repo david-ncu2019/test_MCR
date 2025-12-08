@@ -8,6 +8,7 @@
 !main.py
 !solver.py
 !utils.py
+!optimize_parameters.py
 
 # And allow directories so we can traverse them
 !*/

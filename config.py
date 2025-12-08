@@ -2,7 +2,7 @@
 
 # File Paths
 INPUT_FILE = 'subset_synthetic_MLCW_layers_differential.csv'
-OUTPUT_FILE = 'results_DIFFDISP_6.csv'
+OUTPUT_FILE = 'results_DIFFDISP_1.csv'
 
 # Column Configurations
 TOTAL_COL = 'Layer_Total'
@@ -15,7 +15,6 @@ TARGET_LAYERS = [
     'Layer_2',
     'Layer_3', 
     'Layer_4',
-    'Layer_5'
 ]
 
 # MCR-ALS Solver Parameters

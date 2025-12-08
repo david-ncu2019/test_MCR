@@ -6,6 +6,7 @@ import config
 def load_and_preprocess(file_path):
     """
     Loads raw data with robust separator detection.
+    Returns coordinate dataframe for analytics.
     """
     try:
         df = pd.read_csv(file_path, sep='\t')
@@ -29,7 +30,7 @@ def load_and_preprocess(file_path):
     coord_df = df.groupby(config.STATION_COL)[config.COORD_COLS].first()
     coords = coord_df.loc[D_df.index].values
 
-    return df, D_df, D, coords, layer_cols
+    return df, D_df, D, coords, layer_cols, coord_df
 
 def generate_ratio_initialization(df, layer_cols, stations):
     """
@@ -39,7 +40,7 @@ def generate_ratio_initialization(df, layer_cols, stations):
     n_layers = len(layer_cols)
     
     C_init = np.zeros((n_stations, n_layers))
-    anchor_mask = np.zeros((n_stations, n_layers), dtype=bool) # <--- NEW
+    anchor_mask = np.zeros((n_stations, n_layers), dtype=bool)
 
     station_map = {name: i for i, name in enumerate(stations)}
 
@@ -56,6 +57,6 @@ def generate_ratio_initialization(df, layer_cols, stations):
                 local_ratio = np.median(ratios)
                 
                 C_init[idx, i] = local_ratio
-                anchor_mask[idx, i] = True  # <--- Mark as "Known", even if 0.0
+                anchor_mask[idx, i] = True  # Mark as "Known"
                 
     return C_init, anchor_mask

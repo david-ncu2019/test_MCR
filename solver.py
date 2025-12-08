@@ -10,13 +10,18 @@ def run_mcr_solver(D, C_init, anchor_mask, coords):
     Runs MCR-ALS with Explicit Masking and Physical Constraints.
     """
     # 1. Constraints
+    # Apply parameter overrides for optimization
+    spatial_alpha = override_params.get('spatial_alpha', config.SPATIAL_ALPHA) if override_params else config.SPATIAL_ALPHA
+    anchor_strength = override_params.get('anchor_strength', config.ANCHOR_STRENGTH) if override_params else config.ANCHOR_STRENGTH
+    spatial_neighbors = override_params.get('spatial_neighbors', config.SPATIAL_NEIGHBORS) if override_params else config.SPATIAL_NEIGHBORS
+
     spatial_const = SpatialSmoother(
         coordinates=coords, 
         C_init=C_init,
-        anchor_mask=anchor_mask,        # <--- Passing the mask
-        anchor_strength=config.ANCHOR_STRENGTH,
-        n_neighbors=config.SPATIAL_NEIGHBORS, 
-        alpha=config.SPATIAL_ALPHA
+        anchor_mask=anchor_mask,
+        anchor_strength=anchor_strength,
+        n_neighbors=spatial_neighbors, 
+        alpha=spatial_alpha
     )
     
     temporal_const = TemporalSmoother(
