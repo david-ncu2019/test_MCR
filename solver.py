@@ -5,7 +5,7 @@ from sklearn.linear_model import Ridge
 import config
 from utils import SpatialSmoother, TemporalSmoother
 
-def run_mcr_solver(D, C_init, anchor_mask, coords):
+def run_mcr_solver(D, C_init, anchor_mask, coords, override_params=None):
     """
     Runs MCR-ALS with Explicit Masking and Physical Constraints.
     """

@@ -1,4 +1,4 @@
-# optimize_parameters.py - Scientific parameter optimization via cross-validation
+# optimize_parameters.py
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, ParameterGrid
@@ -8,10 +8,15 @@ import config
 import data_loader
 import solver
 import warnings
+
+# Suppress convergence warnings during optimization scans
 warnings.filterwarnings('ignore')
 
 class MCROptimizer:
-    """Cross-validation optimization for MCR-ALS hyperparameters."""
+    """
+    Scientific parameter optimization for MCR-ALS using K-Fold Cross-Validation.
+    Prevents overfitting by testing model performance on unseen stations.
+    """
     
     def __init__(self, n_folds=5, random_state=42, verbose=True):
         self.n_folds = n_folds
@@ -21,188 +26,171 @@ class MCROptimizer:
     
     def optimize_spatial_parameters(self, param_grid=None):
         """
-        Optimize spatial parameters using K-fold cross-validation.
+        Performs Grid Search with Cross-Validation.
         
+        Args:
+            param_grid (dict): Dictionary of parameters to test.
+                               e.g., {'spatial_alpha': [0.1, 0.3], ...}
+                               
         Returns:
-        --------
-        best_params : dict
-            Optimal parameter values
-        results_df : pd.DataFrame
-            Full optimization results
+            best_params (dict): The parameter combination with lowest Error.
+            results_df (DataFrame): Table of all test results.
         """
+        # 1. Load Data ONCE
+        print("[Optimization] Loading Dataset...")
+        
+        # --- FIX: Unpack 6 values (ignoring the last one) ---
+        df, D_df, D, coords, layer_cols, _ = data_loader.load_and_preprocess(config.INPUT_FILE)
+        
+        station_indices = np.arange(len(D))
+        station_names = D_df.index.values
+        
+        # Default grid if none provided
         if param_grid is None:
             param_grid = {
                 'spatial_alpha': [0.0, 0.1, 0.3, 0.5, 0.7, 0.9],
-                'anchor_strength': [0.3, 0.5, 0.7, 0.9],
+                'anchor_strength': [0.5, 0.7, 0.9, 1.0],
                 'spatial_neighbors': [3, 5, 8]
             }
         
-        print("--- MCR-ALS Hyperparameter Optimization ---")
-        print(f"Parameter grid: {param_grid}")
-        print(f"Cross-validation: {self.n_folds}-fold")
+        # 2. Iterate through every combination (Grid Search)
+        grid = list(ParameterGrid(param_grid))
+        print(f"[Optimization] Starting scan of {len(grid)} parameter combinations...")
         
-        # Load data once
-        df, D_df, D, coords, layer_cols = data_loader.load_and_preprocess(config.INPUT_FILE)
-        station_indices = np.arange(len(D))
-        
-        results = []
-        param_combinations = list(ParameterGrid(param_grid))
-        
-        for i, params in enumerate(param_combinations):
+        for i, params in enumerate(grid):
             if self.verbose:
-                print(f"\n[{i+1}/{len(param_combinations)}] Testing: {params}")
+                print(f"  Testing config {i+1}/{len(grid)}: {params}")
             
-            fold_scores = self._cross_validate_params(
-                params, df, D_df, D, coords, layer_cols, station_indices
-            )
+            fold_errors_mse = []
+            fold_errors_mae = []
             
-            if fold_scores:
-                avg_mse = np.mean(fold_scores)
-                std_mse = np.std(fold_scores)
+            # 3. K-Fold Cross Validation
+            kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
+            
+            for train_idx, test_idx in kf.split(station_indices):
+                # --- Step A: Prepare Training Data ---
+                D_train = D[train_idx]
+                coords_train = coords[train_idx]
                 
-                result = {
-                    **params,
-                    'mean_mse': avg_mse,
-                    'std_mse': std_mse,
-                    'fold_scores': fold_scores
-                }
-                results.append(result)
+                # Prevent Data Leakage: Generate C_init using ONLY training stations
+                train_stations_list = station_names[train_idx]
+                df_train = df[df[config.STATION_COL].isin(train_stations_list)]
                 
-                if self.verbose:
-                    print(f"  -> MSE: {avg_mse:.6f} ± {std_mse:.6f}")
-        
-        # Find best parameters
-        if not results:
-            raise RuntimeError("No valid parameter combinations found")
-        
-        results_df = pd.DataFrame(results)
-        best_idx = results_df['mean_mse'].idxmin()
-        best_params = results_df.iloc[best_idx].to_dict()
-        
-        print(f"\n=== OPTIMIZATION COMPLETE ===")
-        print(f"Best parameters: {best_params}")
-        print(f"Best MSE: {best_params['mean_mse']:.6f}")
-        
-        self.results_history.append(results_df)
-        return best_params, results_df
-    
-    def _cross_validate_params(self, params, df, D_df, D, coords, layer_cols, station_indices):
-        """Run cross-validation for given parameters."""
-        fold_scores = []
-        kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
-        
-        for train_idx, test_idx in kf.split(station_indices):
-            try:
-                score = self._evaluate_single_fold(
-                    params, df, D_df, D, coords, layer_cols, train_idx, test_idx
+                # Generate initialization/mask for this specific fold
+                C_init_train, mask_train = data_loader.generate_ratio_initialization(
+                    df_train, layer_cols, train_stations_list
                 )
-                if score is not None:
-                    fold_scores.append(score)
-            except Exception as e:
-                if self.verbose:
-                    print(f"    Fold failed: {str(e)}")
-                continue
-        
-        return fold_scores if len(fold_scores) >= self.n_folds // 2 else None
-    
-    def _evaluate_single_fold(self, params, df, D_df, D, coords, layer_cols, train_idx, test_idx):
-        """Evaluate single cross-validation fold."""
-        # Prepare training data
-        D_train = D[train_idx]
-        coords_train = coords[train_idx]
-        train_stations = D_df.index[train_idx]
-        
-        df_train = df[df[config.STATION_COL].isin(train_stations)]
-        C_init_train, mask_train = data_loader.generate_ratio_initialization(
-            df_train, layer_cols, train_stations
-        )
-        
-        # Run MCR-ALS on training set
-        C_train, ST_train = solver.run_mcr_solver(
-            D_train, C_init_train, mask_train, coords_train, override_params=params
-        )
-        
-        # Predict test set
-        coords_test = coords[test_idx]
-        D_test_actual = D[test_idx]
-        
-        # Interpolate coefficients to test locations
-        C_test_pred = self._interpolate_coefficients(coords_train, C_train, coords_test)
-        
-        # Reconstruct test data
-        D_test_pred = np.dot(C_test_pred, ST_train)
-        
-        # Calculate prediction error
-        valid_mask = (D_test_actual != 0) & ~np.isnan(D_test_actual)
-        if np.sum(valid_mask) < 5:  # Need minimum valid points
-            return None
-        
-        mse = mean_squared_error(D_test_actual[valid_mask], D_test_pred[valid_mask])
-        return mse
-    
-    def _interpolate_coefficients(self, coords_train, C_train, coords_test):
-        """Interpolate spatial coefficients to test locations."""
-        C_test_pred = np.zeros((len(coords_test), C_train.shape[1]))
-        
-        for k in range(C_train.shape[1]):
-            # Try different interpolation methods as fallback
-            methods = ['linear', 'nearest']
-            for method in methods:
+                
+                # --- Step B: Run MCR Solver ---
                 try:
-                    C_test_pred[:, k] = griddata(
-                        coords_train, C_train[:, k], coords_test, 
-                        method=method, fill_value=0
+                    # Pass the current parameters to override config defaults
+                    C_train_opt, ST_train_opt = solver.run_mcr_solver(
+                        D_train, C_init_train, mask_train, coords_train, 
+                        override_params=params
                     )
-                    break
-                except:
+                except Exception as e:
+                    print(f"    ! Solver failed for fold: {e}")
                     continue
+
+                # --- Step C: Predict Test Data (The Validation) ---
+                coords_test = coords[test_idx]
+                D_test_actual = D[test_idx]
+                
+                # Interpolate Spatial Maps (C) from Train -> Test locations
+                C_test_pred = np.zeros((len(test_idx), C_train_opt.shape[1]))
+                
+                for k in range(C_train_opt.shape[1]):
+                    # Use 'nearest' to handle edge stations (prevents NaNs)
+                    C_test_pred[:, k] = griddata(
+                        coords_train, 
+                        C_train_opt[:, k], 
+                        coords_test, 
+                        method='nearest' 
+                    )
+                
+                # Reconstruct Data: Space (Interpolated) * Time (Global)
+                D_test_pred = np.dot(C_test_pred, ST_train_opt)
+                
+                # --- Step D: Evaluate Error ---
+                mse = mean_squared_error(D_test_actual, D_test_pred)
+                mae = mean_absolute_error(D_test_actual, D_test_pred)
+                
+                fold_errors_mse.append(mse)
+                fold_errors_mae.append(mae)
+            
+            # 4. Aggregate Results
+            if fold_errors_mse:
+                avg_mse = np.mean(fold_errors_mse)
+                avg_mae = np.mean(fold_errors_mae)
+                
+                result_entry = params.copy()
+                result_entry['MSE'] = avg_mse
+                result_entry['MAE'] = avg_mae
+                self.results_history.append(result_entry)
+                
+                if self.verbose:
+                    print(f"    -> Avg MSE: {avg_mse:.6f} | MAE: {avg_mae:.6f}")
+            else:
+                if self.verbose:
+                    print(f"    -> Failed to compute errors.")
+
+        # 5. Finalize
+        results_df = pd.DataFrame(self.results_history)
         
-        return C_test_pred
-    
+        # Find best parameters (lowest MSE)
+        best_row = results_df.loc[results_df['MSE'].idxmin()]
+        best_params = best_row.drop(['MSE', 'MAE']).to_dict()
+        
+        # Convert numeric parameters back to proper types
+        if 'spatial_neighbors' in best_params:
+            best_params['spatial_neighbors'] = int(best_params['spatial_neighbors'])
+            
+        print("\n=== OPTIMIZATION COMPLETE ===")
+        print(f"Best Parameters found: {best_params}")
+        print(f"Lowest MSE: {best_row['MSE']:.6e}")
+        
+        return best_params, results_df
+
     def save_results(self, results_df, filename='optimization_results.csv'):
-        """Save optimization results to CSV."""
-        # Flatten fold_scores for saving
-        results_save = results_df.copy()
-        results_save['fold_scores_str'] = results_save['fold_scores'].astype(str)
-        results_save = results_save.drop('fold_scores', axis=1)
-        
-        results_save.to_csv(filename, index=False)
+        results_df.to_csv(filename, index=False)
         print(f"Optimization results saved to: {filename}")
 
+# --- Helper Functions for Main ---
+
 def run_quick_optimization():
-    """Quick optimization with smaller parameter grid."""
+    """
+    Fast scan: Good for quick checks.
+    """
     param_grid = {
-        'spatial_alpha': [0.1, 0.3, 0.5, 0.7],
-        'anchor_strength': [0.5, 0.7],
-        'spatial_neighbors': [5, 8]
+        'spatial_alpha': [0.1, 0.3, 0.5],
+        'anchor_strength': [0.5, 1.0],
+        'spatial_neighbors': [5]
     }
     
+    print("Running Quick Optimization...")
     optimizer = MCROptimizer(n_folds=3, verbose=True)
     best_params, results_df = optimizer.optimize_spatial_parameters(param_grid)
-    optimizer.save_results(results_df)
+    optimizer.save_results(results_df, 'opt_results_quick.csv')
     
     return best_params, results_df
 
 def run_full_optimization():
-    """Comprehensive optimization with full parameter grid."""
+    """
+    Deep scan: Good for final paper results.
+    """
     param_grid = {
-        'spatial_alpha': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-        'anchor_strength': [0.3, 0.5, 0.7, 0.9],
-        'spatial_neighbors': [3, 5, 8, 10],
+        'spatial_alpha': [0.0, 0.1, 0.3, 0.5, 0.7, 0.9],
+        'anchor_strength': [0.5, 0.8, 1.0],
+        'spatial_neighbors': [3, 5, 8]
     }
     
+    print("Running Full Scientific Optimization...")
     optimizer = MCROptimizer(n_folds=5, verbose=True)
     best_params, results_df = optimizer.optimize_spatial_parameters(param_grid)
-    optimizer.save_results(results_df)
+    optimizer.save_results(results_df, 'opt_results_full.csv')
     
     return best_params, results_df
 
 if __name__ == "__main__":
-    # Run quick optimization by default
-    print("Running quick optimization...")
-    best_params, results = run_quick_optimization()
-    
-    print(f"\nTo use optimized parameters, update config.py:")
-    print(f"SPATIAL_ALPHA = {best_params['spatial_alpha']}")
-    print(f"ANCHOR_STRENGTH = {best_params['anchor_strength']}")
-    print(f"SPATIAL_NEIGHBORS = {best_params['spatial_neighbors']}")
+    # Test run
+    run_quick_optimization()

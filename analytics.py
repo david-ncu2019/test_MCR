@@ -3,10 +3,14 @@ import pandas as pd
 import numpy as np
 import config
 
-def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path):
+def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path, coord_df=None):
+    """
+    Reconstructs the full dataset from C and ST matrices and saves to CSV.
+    Now supports adding Station Coordinates (X, Y) to the output.
+    """
     print("Reconstructing full fields...")
     
-    # Lookup dictionaries
+    # Lookup dictionaries for fast generation
     coeff_df = pd.DataFrame(C_final, index=D_df.index, columns=layer_cols)
     coeff_dict = coeff_df.to_dict('index')
     
@@ -38,8 +42,9 @@ def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path):
             
             entry[f'{layer}_Coeff'] = coeff
             entry[f'{layer}_Pred'] = pred_val
-            entry[f'{layer}_TimeSignature'] = sig_val # <--- Added for debugging
+            entry[f'{layer}_TimeSignature'] = sig_val # Debugging field
             
+            # If we have original sparse data, calculate residual
             if pd.notna(row.get(layer)):
                 entry[f'{layer}_Original'] = row[layer]
                 entry[f'{layer}_Residual'] = row[layer] - pred_val
@@ -47,6 +52,14 @@ def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path):
         results.append(entry)
         
     final_df = pd.DataFrame(results)
+    
+    # --- FIX: Merge Coordinates if provided ---
+    if coord_df is not None:
+        print("Adding coordinates to output...")
+        # Join on STATION index
+        final_df = final_df.join(coord_df, on='STATION')
+    # ------------------------------------------
+    
     final_df.to_csv(output_path, index=False)
     print(f"Results saved to {output_path}")
     
