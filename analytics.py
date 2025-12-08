@@ -4,12 +4,9 @@ import numpy as np
 import config
 
 def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path):
-    """
-    Reconstructs the full dataset from C and ST matrices and saves to CSV.
-    """
     print("Reconstructing full fields...")
     
-    # Lookup dictionaries for fast generation
+    # Lookup dictionaries
     coeff_df = pd.DataFrame(C_final, index=D_df.index, columns=layer_cols)
     coeff_dict = coeff_df.to_dict('index')
     
@@ -19,8 +16,6 @@ def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path):
     
     results = []
     
-    # We iterate through the original DF to preserve structure/metadata
-    # but fill in the Model predictions
     for idx, row in df.iterrows():
         stat = row[config.STATION_COL]
         t = row[config.TIME_COL]
@@ -36,9 +31,6 @@ def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path):
             'Observed_Total': row[config.TOTAL_COL]
         }
         
-        # Calculate Model Prediction for Total (Sum of parts)
-        # Note: In unconstrained MCR, Sum(Parts) != Total, which is what we want.
-        
         for layer in layer_cols:
             coeff = coeff_dict[stat][layer]
             sig_val = sig_dict[layer][t_idx]
@@ -46,9 +38,8 @@ def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path):
             
             entry[f'{layer}_Coeff'] = coeff
             entry[f'{layer}_Pred'] = pred_val
-            entry[f'{layer}_TimeSignature'] = sig_val
+            entry[f'{layer}_TimeSignature'] = sig_val # <--- Added for debugging
             
-            # If we have original sparse data, calculate residual
             if pd.notna(row.get(layer)):
                 entry[f'{layer}_Original'] = row[layer]
                 entry[f'{layer}_Residual'] = row[layer] - pred_val

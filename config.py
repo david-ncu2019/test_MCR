@@ -2,7 +2,7 @@
 
 # File Paths
 INPUT_FILE = 'subset_synthetic_MLCW_layers_differential.csv'
-OUTPUT_FILE = 'results_DIFFDISP_3.csv'
+OUTPUT_FILE = 'results_DIFFDISP_4.csv'
 
 # Column Configurations
 TOTAL_COL = 'Layer_Total'
@@ -18,7 +18,7 @@ TARGET_LAYERS = [
 ]
 
 # MCR-ALS Solver Parameters
-RIDGE_ALPHA = 1e-6         
+RIDGE_ALPHA = 1e-6        # Very low regularization for clean data
 MAX_ITERATIONS = 50       
 CONVERGENCE_TOL = 1e-6    
 
@@ -26,10 +26,9 @@ CONVERGENCE_TOL = 1e-6
 SPATIAL_NEIGHBORS = 5     
 SPATIAL_ALPHA = 0.3       
 
-# --- NEW: Anchor Strength (0.0 to 1.0) ---
-# 0.9 = Strong trust in input data (Stiff)
-# 0.1 = Weak trust in input data (Flexible)
+# Anchor Strength (0.0 = Free, 1.0 = Rigid)
 ANCHOR_STRENGTH = 0.5     
 
+# Temporal Smoothing (0 = Off, useful for sharp jumps in clean data)
 TEMPORAL_WINDOW = 0       
 TEMPORAL_POLY_ORDER = 2
