@@ -1,0 +1,16 @@
+# Ignore everything by default
+*
+**/
+
+!analytics.py
+!config.py
+!data_loader.py
+!main.py
+!solver.py
+!utils.py
+
+# And allow directories so we can traverse them
+!*/
+
+# Allow .gitignore itself
+!.gitignore

@@ -2,7 +2,7 @@
 
 # File Paths
 INPUT_FILE = 'subset_synthetic_MLCW_layers_differential.csv'
-OUTPUT_FILE = 'results_DIFFDISP_4.csv'
+OUTPUT_FILE = 'results_DIFFDISP_6.csv'
 
 # Column Configurations
 TOTAL_COL = 'Layer_Total'
@@ -14,7 +14,8 @@ TARGET_LAYERS = [
     'Layer_1',
     'Layer_2',
     'Layer_3', 
-    'Layer_4'
+    'Layer_4',
+    'Layer_5'
 ]
 
 # MCR-ALS Solver Parameters
@@ -27,7 +28,7 @@ SPATIAL_NEIGHBORS = 5
 SPATIAL_ALPHA = 0.3       
 
 # Anchor Strength (0.0 = Free, 1.0 = Rigid)
-ANCHOR_STRENGTH = 0.5     
+ANCHOR_STRENGTH = 1 
 
 # Temporal Smoothing (0 = Off, useful for sharp jumps in clean data)
 TEMPORAL_WINDOW = 0       
