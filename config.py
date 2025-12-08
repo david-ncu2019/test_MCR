@@ -1,14 +1,14 @@
 # config.py
 
 # File Paths
-INPUT_FILE = 'CRFP_diffdisp.txt'
-OUTPUT_FILE = 'robust_mcr_results.csv'
+INPUT_FILE = 'subset_synthetic_MLCW_layers_differential.csv'
+OUTPUT_FILE = 'robust_mcr_results3.csv'
 
 # Column Configurations
-TOTAL_COL = 'DIFFDISP'   # The observed total signal
+TOTAL_COL = 'Layer_Total'   # The observed total signal
 STATION_COL = 'STATION'
 TIME_COL = 'time'
-COORD_COLS = ['X_TWD97', 'Y_TWD97']
+COORD_COLS = ['X', 'Y']
 
 # --- NEW: Explicitly Define Target Variables ---
 # Only these specific columns will be solved for.
