@@ -46,6 +46,7 @@ def save_predictions(df, D_df, C_final, ST_final, layer_cols, output_path):
             
             entry[f'{layer}_Coeff'] = coeff
             entry[f'{layer}_Pred'] = pred_val
+            entry[f'{layer}_TimeSignature'] = sig_val
             
             # If we have original sparse data, calculate residual
             if pd.notna(row.get(layer)):

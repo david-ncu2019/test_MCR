@@ -13,6 +13,7 @@ def run_mcr_solver(D, C_init, coords):
     spatial_const = SpatialSmoother(
         coordinates=coords, 
         C_init=C_init,          # <--- FIXED: Now passing the Anchor Matrix
+        anchor_strength=config.ANCHOR_STRENGTH,  # <--- PASS CONTROL KNOB HERE
         n_neighbors=config.SPATIAL_NEIGHBORS, 
         alpha=config.SPATIAL_ALPHA
     )
@@ -22,7 +23,7 @@ def run_mcr_solver(D, C_init, coords):
         polyorder=config.TEMPORAL_POLY_ORDER
     )
     
-    norm_const = ConstraintNorm(axis=1)
+    # norm_const = ConstraintNorm(axis=1)
     nonneg_const = ConstraintNonneg() # <--- FIXED: Enforce positive physics
 
     # 2. Setup Regressor
@@ -32,9 +33,11 @@ def run_mcr_solver(D, C_init, coords):
     mcr = McrAR(
         c_regr=ridge,
         st_regr=ridge,
-        # Order: Smooth/Anchor -> Enforce Non-Negativity
+        # Order: 1. Anchor/Smooth, 2. Enforce Positivity
         c_constraints=[spatial_const, nonneg_const], 
-        st_constraints=[temporal_const, norm_const],
+        # st_constraints=[temporal_const, norm_const],
+        # CRITICAL FIX: Removed norm_const so S can be large/negative
+        st_constraints=[temporal_const],
         max_iter=config.MAX_ITERATIONS,
         tol_err_change=config.CONVERGENCE_TOL
     )
