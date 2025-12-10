@@ -159,36 +159,32 @@ class MCROptimizer:
 
 def run_quick_optimization():
     """
-    Fast scan: Good for quick checks.
+    Fast scan using ranges defined in config.py
     """
-    param_grid = {
-        'spatial_alpha': [0.1, 0.3, 0.5],
-        'anchor_strength': [0.5, 1.0],
-        'spatial_neighbors': [5]
-    }
-    
     print("Running Quick Optimization...")
-    optimizer = MCROptimizer(n_folds=3, verbose=True)
-    best_params, results_df = optimizer.optimize_spatial_parameters(param_grid)
-    optimizer.save_results(results_df, 'opt_results_quick.csv')
+    print(f"Testing Grid: {config.PARAM_GRID_QUICK}")
     
+    optimizer = MCROptimizer(n_folds=3, verbose=True)
+    
+    # Pass the config dictionary
+    best_params, results_df = optimizer.optimize_spatial_parameters(config.PARAM_GRID_QUICK)
+    
+    optimizer.save_results(results_df, 'opt_results_quick.csv')
     return best_params, results_df
 
 def run_full_optimization():
     """
-    Deep scan: Good for final paper results.
+    Deep scan using ranges defined in config.py
     """
-    param_grid = {
-        'spatial_alpha': [0.0, 0.1, 0.3, 0.5, 0.7, 0.9],
-        'anchor_strength': [0.5, 0.8, 1.0],
-        'spatial_neighbors': [3, 5, 8]
-    }
-    
     print("Running Full Scientific Optimization...")
-    optimizer = MCROptimizer(n_folds=5, verbose=True)
-    best_params, results_df = optimizer.optimize_spatial_parameters(param_grid)
-    optimizer.save_results(results_df, 'opt_results_full.csv')
+    print(f"Testing Grid: {config.PARAM_GRID_FULL}")
     
+    optimizer = MCROptimizer(n_folds=5, verbose=True)
+    
+    # Pass the config dictionary
+    best_params, results_df = optimizer.optimize_spatial_parameters(config.PARAM_GRID_FULL)
+    
+    optimizer.save_results(results_df, 'opt_results_full.csv')
     return best_params, results_df
 
 if __name__ == "__main__":
